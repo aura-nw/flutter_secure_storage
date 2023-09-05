@@ -83,6 +83,44 @@ You need to
 
 - [disable autobackup](https://developer.android.com/guide/topics/data/autobackup#EnablingAutoBackup), [details](https://github.com/mogol/flutter_secure_storage/issues/13#issuecomment-421083742)
 - [exclude sharedprefs](https://developer.android.com/guide/topics/data/autobackup#IncludingFiles) `FlutterSecureStorage` used by the plugin, [details](https://github.com/mogol/flutter_secure_storage/issues/43#issuecomment-471642126)
+- Note that `userAuthenticationRequiredAndroid` requires the use of a `FragmentActivity` instead of an
+`Activity`. To update your application:
+* If you are using `FlutterActivity` directly, change it to
+`FlutterFragmentActivity` in your `AndroidManifest.xml`.
+* If you are using a custom activity, update your `MainActivity.java`:
+
+    ```java
+    import io.flutter.embedding.android.FlutterFragmentActivity;
+
+    public class MainActivity extends FlutterFragmentActivity {
+        // ...
+    }
+    ```
+
+    or MainActivity.kt:
+
+    ```kotlin
+    import io.flutter.embedding.android.FlutterFragmentActivity
+
+    class MainActivity: FlutterFragmentActivity() {
+        // ...
+    }
+    ```
+
+    to inherit from `FlutterFragmentActivity`.
+
+
+### Configure iOS version
+Note that this plugin works with both Touch ID and Face ID. However, to use the latter,
+you need to also add:
+
+```xml
+<key>NSFaceIDUsageDescription</key>
+<string>Why is my app authenticating using face id?</string>
+```
+
+to your Info.plist file. Failure to do so results in a dialog that tells the user your
+app has not been updated to use Face ID.
 
 ## Configure Web Version
 
