@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import LocalAuthentication
 
 class FlutterSecureStorage{
     
@@ -58,9 +59,11 @@ class FlutterSecureStorage{
         
         if (status == noErr) {
             (ref as! NSArray).forEach { item in
-                let key: String = (item as! NSDictionary)[kSecAttrAccount] as! String
-                let value: String = String(data: (item as! NSDictionary)[kSecValueData] as! Data, encoding: .utf8) ?? ""
-                results[key] = value
+                let key: String = (item as! NSDictionary)[kSecAttrAccount] as! String                
+                if let data = (item as? NSDictionary)?[kSecValueData] as? Data{
+                    let value: String = String(data: data, encoding: .utf8) ?? ""
+                    results[key] = value
+                }
             }
         }
         
@@ -81,6 +84,7 @@ class FlutterSecureStorage{
         if (status == noErr) {
             value = String(data: ref as! Data, encoding: .utf8)
         }
+        
         return FlutterSecureStorageResponse(status: status, value: value)
     }
     
@@ -90,13 +94,16 @@ class FlutterSecureStorage{
         return SecItemDelete(keychainQuery as CFDictionary)
     }
     
+    
     internal func delete(key: String, groupId: String?, accountName: String?, synchronizable: Bool?) -> OSStatus {
+        
         let keychainQuery = baseQuery(key: key, groupId: groupId, accountName: accountName, synchronizable: synchronizable, returnData: true)
         
         return SecItemDelete(keychainQuery as CFDictionary)
     }
     
-    internal func write(key: String, value: String, groupId: String?, accountName: String?, synchronizable: Bool?, accessibility: String?) -> OSStatus {
+    internal func write(key: String, value: String, groupId: String?, accountName: String?, synchronizable: Bool?, accessibility: String?, useBioMetric : FlutterSecureStorageUseBioMetric.UseBiometric?) -> OSStatus {
+        
         var attrAccessible: CFString = kSecAttrAccessibleWhenUnlocked
         if (accessibility != nil) {
             switch accessibility {
@@ -122,20 +129,27 @@ class FlutterSecureStorage{
         
         let keyExists = containsKey(key: key, groupId: groupId, accountName: accountName, synchronizable: synchronizable)
         var keychainQuery = baseQuery(key: key, groupId: groupId, accountName: accountName, synchronizable: synchronizable, returnData: nil)
-        if (keyExists) {
-            let update: [CFString: Any?] = [
-                kSecValueData: value.data(using: String.Encoding.utf8),
-                kSecAttrAccessible: attrAccessible,
-                kSecAttrSynchronizable: synchronizable
-            ]
-            
-            return SecItemUpdate(keychainQuery as CFDictionary, update as CFDictionary)
-        } else {
-            keychainQuery[kSecValueData] = value.data(using: String.Encoding.utf8)
-            keychainQuery[kSecAttrAccessible] = attrAccessible
-            
-            return SecItemAdd(keychainQuery as CFDictionary, nil)
+        
+        if let useBioMetric = useBioMetric{
+            return FlutterSecureStorageUseBioMetric.write(query: keychainQuery, attrAccessible: attrAccessible, keyExists: keyExists, synchronizable: synchronizable, value: value, useBioMetric: useBioMetric)
         }
+   
+        if (keyExists) {
+                
+                var update: [CFString: Any?] = [
+                    kSecValueData: value.data(using: String.Encoding.utf8),
+                    kSecAttrSynchronizable: synchronizable
+                ]
+                
+                update[kSecAttrAccessible] = attrAccessible
+                
+                return SecItemUpdate(keychainQuery as CFDictionary, update as CFDictionary)
+            } else {
+                keychainQuery[kSecValueData] = value.data(using: String.Encoding.utf8)
+                keychainQuery[kSecAttrAccessible] = attrAccessible
+                
+                return SecItemAdd(keychainQuery as CFDictionary, nil)
+            }
     }
     
     struct FlutterSecureStorageResponse {
