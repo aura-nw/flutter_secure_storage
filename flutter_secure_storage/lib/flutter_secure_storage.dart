@@ -1,5 +1,6 @@
 library flutter_secure_storage;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';

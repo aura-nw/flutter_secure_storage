@@ -70,13 +70,19 @@ class ItemsWidgetState extends State<ItemsWidget> {
   }
 
   IOSOptions _getIOSOptions() => IOSOptions(
-        accountName: _getAccountName(),
-      );
+      accountName: _getAccountName(),
+      iosUserAuthenticationRequired: IOSUserAuthenticationRequired(
+          localizedReason: "Test biometric reason"));
 
   AndroidOptions _getAndroidOptions() => const AndroidOptions(
         encryptedSharedPreferences: true,
-        // sharedPreferencesName: 'Test2',
-        // preferencesKeyPrefix: 'Test'
+        userAuthenticationRequiredAndroid: UserAuthenticationRequiredAndroid(
+          bioMetricTitle: 'Test biometric title',
+          bioMetricSubTitle: 'Test biometric subtitle',
+          userAuthenticationTimeout: 10,
+        ),
+        sharedPreferencesName: 'TestBiometric',
+        preferencesKeyPrefix: 'TestBiometricPrefix',
       );
 
   String? _getAccountName() =>
