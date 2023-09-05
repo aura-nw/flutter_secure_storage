@@ -20,10 +20,12 @@ class AndroidOptions extends Options {
         StorageCipherAlgorithm.AES_CBC_PKCS7Padding,
     this.sharedPreferencesName,
     this.preferencesKeyPrefix,
+    UserAuthenticationRequiredAndroid? userAuthenticationRequiredAndroid,
   })  : _encryptedSharedPreferences = encryptedSharedPreferences,
         _resetOnError = resetOnError,
         _keyCipherAlgorithm = keyCipherAlgorithm,
-        _storageCipherAlgorithm = storageCipherAlgorithm;
+        _storageCipherAlgorithm = storageCipherAlgorithm,
+        _userAuthenticationRequiredAndroid = userAuthenticationRequiredAndroid;
 
   /// EncryptedSharedPrefences are only available on API 23 and greater
   final bool _encryptedSharedPreferences;
@@ -63,6 +65,9 @@ class AndroidOptions extends Options {
   /// WARNING: If you change this you can't retrieve already saved preferences.
   final String? preferencesKeyPrefix;
 
+  /// Authentication is required to access a resource.
+  final UserAuthenticationRequiredAndroid? _userAuthenticationRequiredAndroid;
+
   static const AndroidOptions defaultOptions = AndroidOptions();
 
   @override
@@ -73,6 +78,11 @@ class AndroidOptions extends Options {
         'storageCipherAlgorithm': describeEnum(_storageCipherAlgorithm),
         'sharedPreferencesName': sharedPreferencesName ?? '',
         'preferencesKeyPrefix': preferencesKeyPrefix ?? '',
+        'userAuthenticationRequired': _userAuthenticationRequiredAndroid == null
+            ? 'null'
+            : jsonEncode(
+                _userAuthenticationRequiredAndroid!.toMap(),
+              ),
       };
 
   AndroidOptions copyWith({
@@ -82,6 +92,7 @@ class AndroidOptions extends Options {
     StorageCipherAlgorithm? storageCipherAlgorithm,
     String? preferencesKeyPrefix,
     String? sharedPreferencesName,
+    UserAuthenticationRequiredAndroid? userAuthenticationRequiredAndroid,
   }) =>
       AndroidOptions(
         encryptedSharedPreferences:
@@ -92,5 +103,32 @@ class AndroidOptions extends Options {
             storageCipherAlgorithm ?? _storageCipherAlgorithm,
         sharedPreferencesName: sharedPreferencesName,
         preferencesKeyPrefix: preferencesKeyPrefix,
+        userAuthenticationRequiredAndroid: _userAuthenticationRequiredAndroid,
       );
+}
+
+/// Authentication is required to access a resource.
+class UserAuthenticationRequiredAndroid {
+  /// Sets the duration of time (seconds) for which this key is authorized to
+  /// be used after the user is successfully authenticated. This has effect if
+  /// the key requires user authentication for its use
+  final int _userAuthenticationTimeout;
+  final String _bioMetricTitle;
+  final String _bioMetricSubTitle;
+
+  const UserAuthenticationRequiredAndroid({
+    int userAuthenticationTimeout = 1,
+    required String bioMetricTitle,
+    required String bioMetricSubTitle,
+  })  : _userAuthenticationTimeout = userAuthenticationTimeout,
+        _bioMetricTitle = bioMetricTitle,
+        _bioMetricSubTitle = bioMetricSubTitle;
+
+  Map<String, String> toMap() {
+    return {
+      'userAuthenticationTimeout': _userAuthenticationTimeout.toString(),
+      'bioMetricTitle': _bioMetricTitle,
+      'bioMetricSubTitle': _bioMetricSubTitle,
+    };
+  }
 }
