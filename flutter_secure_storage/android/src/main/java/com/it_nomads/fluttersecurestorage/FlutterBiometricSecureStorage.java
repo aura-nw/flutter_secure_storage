@@ -5,7 +5,6 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
-import android.security.keystore.UserNotAuthenticatedException;
 import android.util.Base64;
 import android.util.Log;
 
@@ -33,18 +32,24 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 
 public class FlutterBiometricSecureStorage {
+    static class FlutterBiometricInformationDefault{
+        public  static int userAuthenticationTimeout = 1;
+        public  static String SHARED_PREFERENCES_NAME = "FlutterSecureStorage";
+        public  static String KEY_ALIAS = "Flutter_Biometric_Secure_Storage";
+        public  static String ELEMENT_PREFERENCES_KEY_PREFIX = "ELEMENT_PREFERENCES_KEY_PREFIX";
+    }
 
     private final String TAG = "BiometricSecureStorage";
     private final Context applicationContext;
     private final Charset charset;
-    protected String ELEMENT_PREFERENCES_KEY_PREFIX = "VGhpcyBpcyB0aGUgcHJlZml4IGZvciBhIHNlY3VyZSBzdG9yYWdlCg";
+    protected String ELEMENT_PREFERENCES_KEY_PREFIX = FlutterBiometricInformationDefault.ELEMENT_PREFERENCES_KEY_PREFIX;
 
-    protected String KEY_ALIAS = "Flutter_Biometric_Secure_Storage";
+    protected String KEY_ALIAS = FlutterBiometricInformationDefault.KEY_ALIAS;
     protected Map<String, Object> options;
-    private String SHARED_PREFERENCES_NAME = "FlutterSecureStorage";
+    private String SHARED_PREFERENCES_NAME = FlutterBiometricInformationDefault.SHARED_PREFERENCES_NAME;
     private SharedPreferences preferences;
 
-    private int userAuthenticationTimeout = 1;
+    private int userAuthenticationTimeout = FlutterBiometricInformationDefault.userAuthenticationTimeout;
 
     private Executor executor;
 
@@ -65,20 +70,20 @@ public class FlutterBiometricSecureStorage {
         }
     }
 
-    boolean containsKey(String key) throws GeneralSecurityException, IOException{
+    boolean containsKey(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         return preferences.contains(key);
     }
 
-    String read(String key)  throws GeneralSecurityException, IOException{
+    String read(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         return preferences.getString(key, null);
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, String> readAll()  throws GeneralSecurityException, IOException {
+    public Map<String, String> readAll() throws GeneralSecurityException, IOException {
         ensureInitialized();
         Map<String, String> raw = (Map<String, String>) preferences.getAll();
         Map<String, String> all = new HashMap<>();
@@ -92,14 +97,14 @@ public class FlutterBiometricSecureStorage {
         return all;
     }
 
-    void write(String key, String value)  throws GeneralSecurityException, IOException {
+    void write(String key, String value) throws GeneralSecurityException, IOException {
         ensureInitialized();
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(key, value);
         editor.apply();
     }
 
-    public void delete(String key)  throws GeneralSecurityException, IOException {
+    public void delete(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         SharedPreferences.Editor editor = preferences.edit();
@@ -107,7 +112,7 @@ public class FlutterBiometricSecureStorage {
         editor.apply();
     }
 
-    void deleteAll()  throws GeneralSecurityException, IOException{
+    void deleteAll() throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         final SharedPreferences.Editor editor = preferences.edit();
@@ -128,15 +133,15 @@ public class FlutterBiometricSecureStorage {
             ELEMENT_PREFERENCES_KEY_PREFIX = (String) options.get("preferencesKeyPrefix");
         }
 
-        JSONObject jsonObj;
         try {
-            jsonObj  = new JSONObject((String) Objects.requireNonNull(options.get("userAuthenticationRequired")));
+            JSONObject jsonObj = new JSONObject((String) Objects.requireNonNull(options.get("userAuthenticationRequired")));
 
             if (jsonObj.has("userAuthenticationTimeout") && !((String) jsonObj.get("userAuthenticationTimeout")).isEmpty()) {
-                userAuthenticationTimeout = Integer.parseInt(jsonObj.get("userAuthenticationTimeout").toString()) ;
+                userAuthenticationTimeout = Integer.parseInt(jsonObj.get("userAuthenticationTimeout").toString());
             }
         } catch (JSONException e) {
-            ///
+            Log.e(TAG, "Decode json object error", e);
+            userAuthenticationTimeout = FlutterBiometricInformationDefault.userAuthenticationTimeout;
         }
 
         SharedPreferences nonEncryptedPreferences = applicationContext.getSharedPreferences(
@@ -182,8 +187,7 @@ public class FlutterBiometricSecureStorage {
             paramsSpec
                     .setUserAuthenticationParameters(userAuthenticationTimeout, KeyProperties.AUTH_BIOMETRIC_STRONG | KeyProperties.AUTH_DEVICE_CREDENTIAL)
                     .setUnlockedDeviceRequired(true);
-        }
-        else {
+        } else {
             paramsSpec.setUserAuthenticationValidityDurationSeconds(userAuthenticationTimeout);
         }
 
@@ -198,7 +202,6 @@ public class FlutterBiometricSecureStorage {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         );
     }
-
 
 
     private void initStorageCipher(SharedPreferences source) throws Exception {
@@ -239,38 +242,31 @@ public class FlutterBiometricSecureStorage {
     }
 
 
-    public void setCurrentActivity(FragmentActivity activity){
+    public void setCurrentActivity(FragmentActivity activity) {
         this.currentActivity = activity;
     }
 
     public void requestBiometrics(BiometricPrompt.AuthenticationCallback callback) {
-        final Runnable changeView = new Runnable()
-        {
-            public void run()
-            {
+        final Runnable changeView = new Runnable() {
+            public void run() {
                 executor = ContextCompat.getMainExecutor(applicationContext);
                 BiometricPrompt biometricPrompt = new BiometricPrompt(currentActivity,
                         executor, callback);
 
-                JSONObject jsonObj;
                 try {
-                    jsonObj  = new JSONObject((String) Objects.requireNonNull(options.get("userAuthenticationRequired")));
-                } catch (JSONException e) {
-                    throw new RuntimeException(e);
-                }
+                    JSONObject jsonObj = new JSONObject((String) Objects.requireNonNull(options.get("userAuthenticationRequired")));
 
-                BiometricPrompt.PromptInfo promptInfo = null;
-                try {
-                    promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                    BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                             .setTitle((String) jsonObj.get("bioMetricTitle"))
                             .setSubtitle((String) jsonObj.get("bioMetricSubTitle"))
                             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
                             .build();
-                } catch (JSONException e) {
-                    throw new RuntimeException(e);
-                }
 
-                biometricPrompt.authenticate(promptInfo);
+                    biometricPrompt.authenticate(promptInfo);
+                } catch (JSONException e) {
+                    Log.e(TAG, "Decode json object error", e);
+                    callback.onAuthenticationFailed();
+                }
             }
         };
 

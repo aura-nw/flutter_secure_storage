@@ -322,56 +322,11 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                         break;
                 }
             } catch (UserNotAuthenticatedException e ){
-                flutterBiometricSecureStorage.requestBiometrics(new BiometricPrompt.AuthenticationCallback() {
-                    @Override
-                    public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                        super.onAuthenticationError(errorCode, errString);
-                        StringWriter stringWriter = new StringWriter();
-                        e.printStackTrace(new PrintWriter(stringWriter));
-
-                        result.error("Exception encountered", call.method, errString.toString());
-                    }
-
-                    @Override
-                    public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                        super.onAuthenticationSucceeded(result);
-                        run();
-                    }
-
-                    @Override
-                    public void onAuthenticationFailed() {
-                        super.onAuthenticationFailed();
-                        StringWriter stringWriter = new StringWriter();
-                        e.printStackTrace(new PrintWriter(stringWriter));
-                    }
-                });
-
+                handleUserNotAuthenticatedException(e);
             }
             catch (Exception e){
                 if((e.getCause() instanceof UserNotAuthenticatedException)){
-                    flutterBiometricSecureStorage.requestBiometrics(new BiometricPrompt.AuthenticationCallback() {
-                        @Override
-                        public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                            super.onAuthenticationError(errorCode, errString);
-                            StringWriter stringWriter = new StringWriter();
-                            e.printStackTrace(new PrintWriter(stringWriter));
-                            result.error("Exception encountered", call.method, errString.toString());
-                        }
-
-                        @Override
-                        public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                            super.onAuthenticationSucceeded(result);
-                            run();
-                        }
-
-                        @Override
-                        public void onAuthenticationFailed() {
-                            super.onAuthenticationFailed();
-                            StringWriter stringWriter = new StringWriter();
-                            e.printStackTrace(new PrintWriter(stringWriter));
-                            result.error("Exception encountered", call.method, "onAuthenticationFailed ");
-                        }
-                    });
+                    handleUserNotAuthenticatedException((UserNotAuthenticatedException) e.getCause());
                     return;
                 }
 
@@ -379,6 +334,33 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                 e.printStackTrace(new PrintWriter(stringWriter));
             }
 
+        }
+
+
+        private void handleUserNotAuthenticatedException(UserNotAuthenticatedException e){
+            flutterBiometricSecureStorage.requestBiometrics(new BiometricPrompt.AuthenticationCallback() {
+                @Override
+                public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                    super.onAuthenticationError(errorCode, errString);
+                    StringWriter stringWriter = new StringWriter();
+                    e.printStackTrace(new PrintWriter(stringWriter));
+
+                    result.error("Exception encountered", call.method, errString.toString());
+                }
+
+                @Override
+                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                    super.onAuthenticationSucceeded(result);
+                    run();
+                }
+
+                @Override
+                public void onAuthenticationFailed() {
+                    super.onAuthenticationFailed();
+                    StringWriter stringWriter = new StringWriter();
+                    e.printStackTrace(new PrintWriter(stringWriter));
+                }
+            });
         }
 
         private void handleException(Exception e) {
