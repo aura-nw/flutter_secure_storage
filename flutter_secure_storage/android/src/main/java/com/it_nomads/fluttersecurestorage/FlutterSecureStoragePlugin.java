@@ -27,7 +27,7 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 
-public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlugin , ActivityAware{
+public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlugin, ActivityAware {
 
     private static final String TAG = "FlutterSecureStoragePl";
     private MethodChannel channel;
@@ -92,7 +92,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
     }
 
     private String addPrefixToKey(String key) {
-        if(isUseBiometric){
+        if (isUseBiometric) {
             return flutterBiometricSecureStorage.ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
         }
         return secureStorage.ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
@@ -101,7 +101,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
     @Override
     public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
         Activity activity = binding.getActivity();
-        if(activity instanceof FragmentActivity ){
+        if (activity instanceof FragmentActivity) {
             flutterBiometricSecureStorage.setCurrentActivity((FragmentActivity) binding.getActivity());
         }
 
@@ -115,7 +115,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
     @Override
     public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
         Activity activity = binding.getActivity();
-        if(activity instanceof FragmentActivity ){
+        if (activity instanceof FragmentActivity) {
             flutterBiometricSecureStorage.setCurrentActivity((FragmentActivity) binding.getActivity());
         }
     }
@@ -175,16 +175,14 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                     userAuthenticationRequired = true;
                 }
 
-                if(userAuthenticationRequired){
+                if (userAuthenticationRequired) {
                     isUseBiometric = true;
                     biometricSecureStorageRun();
-                }
-                else {
+                } else {
                     isUseBiometric = false;
                     secureStorageRun();
                 }
-            }
-            catch (Exception e){
+            } catch (Exception e) {
                 StringWriter stringWriter = new StringWriter();
                 e.printStackTrace(new PrintWriter(stringWriter));
                 result.error("Exception encountered", call.method, stringWriter.toString());
@@ -192,7 +190,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
         }
 
 
-        void secureStorageRun(){
+        void secureStorageRun() {
             boolean resetOnError = false;
             try {
                 secureStorage.options = (Map<String, Object>) ((Map<String, Object>) call.arguments).get("options");
@@ -264,7 +262,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
             }
         }
 
-        void biometricSecureStorageRun() throws Exception{
+        void biometricSecureStorageRun() throws Exception {
             try {
                 flutterBiometricSecureStorage.options = (Map<String, Object>) ((Map<String, Object>) call.arguments).get("options");
 
@@ -293,7 +291,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                         break;
                     }
                     case "readAll": {
-                        Map<String,String> value = flutterBiometricSecureStorage.readAll();
+                        Map<String, String> value = flutterBiometricSecureStorage.readAll();
 
                         result.success(value);
                         break;
@@ -321,11 +319,8 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                         result.notImplemented();
                         break;
                 }
-            } catch (UserNotAuthenticatedException e ){
-                handleUserNotAuthenticatedException(e);
-            }
-            catch (Exception e){
-                if((e.getCause() instanceof UserNotAuthenticatedException)){
+            } catch (Exception e) {
+                if ((e.getCause() instanceof UserNotAuthenticatedException)) {
                     handleUserNotAuthenticatedException((UserNotAuthenticatedException) e.getCause());
                     return;
                 }
@@ -337,7 +332,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
         }
 
 
-        private void handleUserNotAuthenticatedException(UserNotAuthenticatedException e){
+        private void handleUserNotAuthenticatedException(UserNotAuthenticatedException e) {
             flutterBiometricSecureStorage.requestBiometrics(new BiometricPrompt.AuthenticationCallback() {
                 @Override
                 public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
