@@ -22,7 +22,8 @@ import java.security.GeneralSecurityException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class FlutterSecureStorage {
+
+public class FlutterSecureStorage implements ISecureStorage{
 
     private final String TAG = "SecureStorageAndroid";
     private final Charset charset;
@@ -47,11 +48,6 @@ public class FlutterSecureStorage {
     }
 
     @SuppressWarnings({"ConstantConditions"})
-    boolean getResetOnError() {
-        return options.containsKey("resetOnError") && options.get("resetOnError").equals("true");
-    }
-
-    @SuppressWarnings({"ConstantConditions"})
     private boolean getUseEncryptedSharedPreferences() {
         if (failedToUseEncryptedSharedPreferences) {
             return false;
@@ -59,12 +55,12 @@ public class FlutterSecureStorage {
         return options.containsKey("encryptedSharedPreferences") && options.get("encryptedSharedPreferences").equals("true") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
     }
 
-    boolean containsKey(String key) {
+    public boolean containsKey(String key) throws Exception {
         ensureInitialized();
         return preferences.contains(key);
     }
 
-    String read(String key) throws Exception {
+    public String read(String key) throws Exception {
         ensureInitialized();
 
         String rawValue = preferences.getString(key, null);
@@ -75,7 +71,7 @@ public class FlutterSecureStorage {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, String> readAll() throws Exception {
+     public Map<String, String> readAll() throws Exception {
         ensureInitialized();
 
         Map<String, String> raw = (Map<String, String>) preferences.getAll();
@@ -98,7 +94,7 @@ public class FlutterSecureStorage {
         return all;
     }
 
-    void write(String key, String value) throws Exception {
+    public void write(String key, String value) throws Exception {
         ensureInitialized();
 
         SharedPreferences.Editor editor = preferences.edit();
@@ -112,7 +108,7 @@ public class FlutterSecureStorage {
         editor.apply();
     }
 
-    public void delete(String key) {
+    public void delete(String key) throws Exception {
         ensureInitialized();
 
         SharedPreferences.Editor editor = preferences.edit();
@@ -120,7 +116,7 @@ public class FlutterSecureStorage {
         editor.apply();
     }
 
-    void deleteAll() {
+    public void deleteAll() throws Exception {
         ensureInitialized();
 
         final SharedPreferences.Editor editor = preferences.edit();
@@ -132,10 +128,10 @@ public class FlutterSecureStorage {
     }
 
     @SuppressWarnings({"ConstantConditions"})
-    private void ensureInitialized() {
-        // Check if already initialized.
-        // TODO: Disable for now because this will break mixed usage of secureSharedPreference
-//        if (preferences != null) return;
+    public void ensureInitialized() {
+        if (options.containsKey("userAuthenticationRequired") && options.get("userAuthenticationRequired") != null) {
+            return;
+        }
 
         if (options.containsKey("sharedPreferencesName") && !((String) options.get("sharedPreferencesName")).isEmpty()) {
             SHARED_PREFERENCES_NAME = (String) options.get("sharedPreferencesName");
@@ -169,6 +165,16 @@ public class FlutterSecureStorage {
         } else {
             preferences = nonEncryptedPreferences;
         }
+    }
+
+    @Override
+    public String addPrefixToKey(String key) {
+        return ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
+    }
+
+    @Override
+    public void handleException(Exception e,IExceptionObserver observer) {
+        observer.onUserUnAuthorizeOrError(e);
     }
 
     private void initStorageCipher(SharedPreferences source) throws Exception {

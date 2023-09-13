@@ -5,9 +5,11 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
+import android.security.keystore.UserNotAuthenticatedException;
 import android.util.Base64;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
@@ -23,6 +25,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -31,7 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
-public class FlutterBiometricSecureStorage {
+public class FlutterBiometricSecureStorage implements  ISecureStorage{
     static class FlutterBiometricInformationDefault{
         public  static int userAuthenticationTimeout = 1;
         public  static String SHARED_PREFERENCES_NAME = "FlutterSecureStorage";
@@ -70,13 +74,13 @@ public class FlutterBiometricSecureStorage {
         }
     }
 
-    boolean containsKey(String key) throws GeneralSecurityException, IOException {
+    public  boolean containsKey(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         return preferences.contains(key);
     }
 
-    String read(String key) throws GeneralSecurityException, IOException {
+    public  String read(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         return preferences.getString(key, null);
@@ -97,7 +101,7 @@ public class FlutterBiometricSecureStorage {
         return all;
     }
 
-    void write(String key, String value) throws GeneralSecurityException, IOException {
+    public  void write(String key, String value) throws GeneralSecurityException, IOException {
         ensureInitialized();
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(key, value);
@@ -112,7 +116,7 @@ public class FlutterBiometricSecureStorage {
         editor.apply();
     }
 
-    void deleteAll() throws GeneralSecurityException, IOException {
+    public  void deleteAll() throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         final SharedPreferences.Editor editor = preferences.edit();
@@ -121,10 +125,7 @@ public class FlutterBiometricSecureStorage {
     }
 
     @SuppressWarnings({"ConstantConditions"})
-    private void ensureInitialized() throws GeneralSecurityException, IOException {
-        // Check if already initialized.
-        // TODO: Disable for now because this will break mixed usage of secureSharedPreference
-
+    public void ensureInitialized() throws GeneralSecurityException, IOException {
         if (options.containsKey("sharedPreferencesName") && !((String) options.get("sharedPreferencesName")).isEmpty()) {
             SHARED_PREFERENCES_NAME = (String) options.get("sharedPreferencesName");
         }
@@ -246,7 +247,43 @@ public class FlutterBiometricSecureStorage {
         this.currentActivity = activity;
     }
 
-    public void requestBiometrics(BiometricPrompt.AuthenticationCallback callback) {
+    @Override
+    public String addPrefixToKey(String key) {
+        return ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
+    }
+
+    @Override
+    public void handleException(Exception e,IExceptionObserver observer) {
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !(e.getCause() instanceof UserNotAuthenticatedException)) {
+                observer.onUserUnAuthorizeOrError(e);
+                return;
+        }
+
+        BiometricPrompt.AuthenticationCallback callback = new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                super.onAuthenticationError(errorCode, errString);
+                StringWriter stringWriter = new StringWriter();
+                e.printStackTrace(new PrintWriter(stringWriter));
+
+                observer.onUserUnAuthorizeOrError(e);
+            }
+
+            @Override
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                observer.onUserAuthorize();
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                super.onAuthenticationFailed();
+                StringWriter stringWriter = new StringWriter();
+                e.printStackTrace(new PrintWriter(stringWriter));
+            }
+        };
+
         final Runnable changeView = new Runnable() {
             public void run() {
                 executor = ContextCompat.getMainExecutor(applicationContext);
@@ -271,8 +308,6 @@ public class FlutterBiometricSecureStorage {
         };
 
         currentActivity.runOnUiThread(changeView);
-
-
     }
 
 }
