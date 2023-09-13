@@ -73,7 +73,6 @@ public class FlutterSecureStorage implements ISecureStorage{
     @SuppressWarnings("unchecked")
      public Map<String, String> readAll() throws Exception {
         ensureInitialized();
-
         Map<String, String> raw = (Map<String, String>) preferences.getAll();
 
         Map<String, String> all = new HashMap<>();
@@ -129,10 +128,6 @@ public class FlutterSecureStorage implements ISecureStorage{
 
     @SuppressWarnings({"ConstantConditions"})
     public void ensureInitialized() {
-        if (options.containsKey("userAuthenticationRequired") && options.get("userAuthenticationRequired") != null) {
-            return;
-        }
-
         if (options.containsKey("sharedPreferencesName") && !((String) options.get("sharedPreferencesName")).isEmpty()) {
             SHARED_PREFERENCES_NAME = (String) options.get("sharedPreferencesName");
         }
@@ -140,7 +135,6 @@ public class FlutterSecureStorage implements ISecureStorage{
         if (options.containsKey("preferencesKeyPrefix") && !((String) options.get("preferencesKeyPrefix")).isEmpty()) {
             ELEMENT_PREFERENCES_KEY_PREFIX = (String) options.get("preferencesKeyPrefix");
         }
-
         SharedPreferences nonEncryptedPreferences = applicationContext.getSharedPreferences(
                 SHARED_PREFERENCES_NAME,
                 Context.MODE_PRIVATE

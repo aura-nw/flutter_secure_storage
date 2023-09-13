@@ -254,8 +254,7 @@ public class FlutterBiometricSecureStorage implements  ISecureStorage{
 
     @Override
     public void handleException(Exception e,IExceptionObserver observer) {
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !(e.getCause() instanceof UserNotAuthenticatedException)) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !(e instanceof  UserNotAuthenticatedException) || (e.getCause() != null && !(e.getCause() instanceof  UserNotAuthenticatedException))) {
                 observer.onUserUnAuthorizeOrError(e);
                 return;
         }

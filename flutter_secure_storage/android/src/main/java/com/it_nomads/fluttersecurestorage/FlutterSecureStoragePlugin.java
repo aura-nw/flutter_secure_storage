@@ -74,7 +74,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
     }
 
     @SuppressWarnings("unchecked")
-    private String getKeyFromCall(MethodCall call) {
+    private String getKeyFromCall(MethodCall call) throws Exception {
         Map<String, Object> arguments = (Map<String, Object>) call.arguments;
         return addPrefixToKey((String) arguments.get("key"));
     }
@@ -85,7 +85,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
         return (String) arguments.get("value");
     }
 
-    private String addPrefixToKey(String key) {
+    private String addPrefixToKey(String key) throws Exception {
         return secureStorageHandler.addPrefixToKey(key);
     }
 
