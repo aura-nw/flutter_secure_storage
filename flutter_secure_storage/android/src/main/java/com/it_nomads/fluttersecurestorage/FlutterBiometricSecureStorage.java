@@ -8,6 +8,7 @@ import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
@@ -51,12 +52,12 @@ public class FlutterBiometricSecureStorage {
 
     private int userAuthenticationTimeout = FlutterBiometricInformationDefault.userAuthenticationTimeout;
 
-    private Executor executor;
-
     private FragmentActivity currentActivity;
 
     private StorageCipher storageCipher;
     private StorageCipherFactory storageCipherFactory;
+
+    private boolean isRequestBiometricDialog;
 
 
     public FlutterBiometricSecureStorage(Context context) {
@@ -169,7 +170,6 @@ public class FlutterBiometricSecureStorage {
 
     @SuppressWarnings({"ConstantConditions"})
     private boolean getUseEncryptedSharedPreferences() {
-
         return options.containsKey("encryptedSharedPreferences") && options.get("encryptedSharedPreferences").equals("true") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
     }
 
@@ -246,12 +246,41 @@ public class FlutterBiometricSecureStorage {
         this.currentActivity = activity;
     }
 
+
+
     public void requestBiometrics(BiometricPrompt.AuthenticationCallback callback) {
         final Runnable changeView = new Runnable() {
             public void run() {
-                executor = ContextCompat.getMainExecutor(applicationContext);
+
+                if(isRequestBiometricDialog){
+                    callback.onAuthenticationError(BiometricPrompt.ERROR_UNABLE_TO_PROCESS, "Another process is currently running, unable to start a new one.");
+                    return;
+                }
+
+                Executor executor = ContextCompat.getMainExecutor(applicationContext);
                 BiometricPrompt biometricPrompt = new BiometricPrompt(currentActivity,
-                        executor, callback);
+                        executor, new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                        super.onAuthenticationError(errorCode, errString);
+                        callback.onAuthenticationError(errorCode, errString);
+                        isRequestBiometricDialog = false;
+                    }
+
+                    @Override
+                    public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                        super.onAuthenticationSucceeded(result);
+                        callback.onAuthenticationSucceeded(result);
+                        isRequestBiometricDialog = false;
+                    }
+
+                    @Override
+                    public void onAuthenticationFailed() {
+                        super.onAuthenticationFailed();
+                        callback.onAuthenticationFailed();
+                        isRequestBiometricDialog = false;
+                    }
+                });
 
                 try {
                     JSONObject jsonObj = new JSONObject((String) Objects.requireNonNull(options.get("userAuthenticationRequired")));
@@ -263,9 +292,12 @@ public class FlutterBiometricSecureStorage {
                             .build();
 
                     biometricPrompt.authenticate(promptInfo);
+                    isRequestBiometricDialog = true;
                 } catch (JSONException e) {
                     Log.e(TAG, "Decode json object error", e);
+
                     callback.onAuthenticationFailed();
+                    isRequestBiometricDialog = false;
                 }
             }
         };

@@ -2,6 +2,7 @@ package com.it_nomads.fluttersecurestorage;
 
 import android.app.Activity;
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -320,11 +321,12 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                         break;
                 }
             } catch (Exception e) {
-                if ((e.getCause() instanceof UserNotAuthenticatedException)) {
-                    handleUserNotAuthenticatedException((UserNotAuthenticatedException) e.getCause());
-                    return;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (e instanceof UserNotAuthenticatedException || e.getCause() instanceof UserNotAuthenticatedException) {
+                        handleUserNotAuthenticatedException(e);
+                        return;
+                    }
                 }
-
                 StringWriter stringWriter = new StringWriter();
                 e.printStackTrace(new PrintWriter(stringWriter));
             }
@@ -332,14 +334,13 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
         }
 
 
-        private void handleUserNotAuthenticatedException(UserNotAuthenticatedException e) {
+        private void handleUserNotAuthenticatedException(Exception e) {
             flutterBiometricSecureStorage.requestBiometrics(new BiometricPrompt.AuthenticationCallback() {
                 @Override
                 public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
                     super.onAuthenticationError(errorCode, errString);
                     StringWriter stringWriter = new StringWriter();
                     e.printStackTrace(new PrintWriter(stringWriter));
-
                     result.error("Exception encountered", call.method, errString.toString());
                 }
 
