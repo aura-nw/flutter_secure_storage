@@ -35,7 +35,7 @@ import java.util.concurrent.Executor;
 public class FlutterBiometricSecureStorage {
     static class FlutterBiometricInformationDefault{
         public  static int userAuthenticationTimeout = 1;
-        public  static String SHARED_PREFERENCES_NAME = "FlutterSecureStorage";
+        public  static String SHARED_PREFERENCES_NAME = "Flutter_Biometric_Secure_Storage_Preference";
         public  static String KEY_ALIAS = "Flutter_Biometric_Secure_Storage";
         public  static String ELEMENT_PREFERENCES_KEY_PREFIX = "ELEMENT_PREFERENCES_KEY_PREFIX";
     }
