@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
+import android.security.keystore.UserNotAuthenticatedException;
 import android.util.Base64;
 import android.util.Log;
 
@@ -24,6 +25,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -32,10 +35,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
-public class FlutterBiometricSecureStorage {
+public class FlutterBiometricSecureStorage implements  ISecureStorage{
     static class FlutterBiometricInformationDefault{
         public  static int userAuthenticationTimeout = 1;
-        public  static String SHARED_PREFERENCES_NAME = "Flutter_Biometric_Secure_Storage_Preference";
+        public  static String SHARED_PREFERENCES_NAME = "FlutterSecureStorage";
         public  static String KEY_ALIAS = "Flutter_Biometric_Secure_Storage";
         public  static String ELEMENT_PREFERENCES_KEY_PREFIX = "ELEMENT_PREFERENCES_KEY_PREFIX";
     }
@@ -52,12 +55,12 @@ public class FlutterBiometricSecureStorage {
 
     private int userAuthenticationTimeout = FlutterBiometricInformationDefault.userAuthenticationTimeout;
 
+    private Executor executor;
+
     private FragmentActivity currentActivity;
 
     private StorageCipher storageCipher;
     private StorageCipherFactory storageCipherFactory;
-
-    private boolean isRequestBiometricDialog;
 
 
     public FlutterBiometricSecureStorage(Context context) {
@@ -71,13 +74,13 @@ public class FlutterBiometricSecureStorage {
         }
     }
 
-    boolean containsKey(String key) throws GeneralSecurityException, IOException {
+    public  boolean containsKey(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         return preferences.contains(key);
     }
 
-    String read(String key) throws GeneralSecurityException, IOException {
+    public  String read(String key) throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         return preferences.getString(key, null);
@@ -98,7 +101,7 @@ public class FlutterBiometricSecureStorage {
         return all;
     }
 
-    void write(String key, String value) throws GeneralSecurityException, IOException {
+    public  void write(String key, String value) throws GeneralSecurityException, IOException {
         ensureInitialized();
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString(key, value);
@@ -113,7 +116,7 @@ public class FlutterBiometricSecureStorage {
         editor.apply();
     }
 
-    void deleteAll() throws GeneralSecurityException, IOException {
+    public  void deleteAll() throws GeneralSecurityException, IOException {
         ensureInitialized();
 
         final SharedPreferences.Editor editor = preferences.edit();
@@ -122,10 +125,7 @@ public class FlutterBiometricSecureStorage {
     }
 
     @SuppressWarnings({"ConstantConditions"})
-    private void ensureInitialized() throws GeneralSecurityException, IOException {
-        // Check if already initialized.
-        // TODO: Disable for now because this will break mixed usage of secureSharedPreference
-
+    public void ensureInitialized() throws GeneralSecurityException, IOException {
         if (options.containsKey("sharedPreferencesName") && !((String) options.get("sharedPreferencesName")).isEmpty()) {
             SHARED_PREFERENCES_NAME = (String) options.get("sharedPreferencesName");
         }
@@ -170,6 +170,7 @@ public class FlutterBiometricSecureStorage {
 
     @SuppressWarnings({"ConstantConditions"})
     private boolean getUseEncryptedSharedPreferences() {
+
         return options.containsKey("encryptedSharedPreferences") && options.get("encryptedSharedPreferences").equals("true") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
     }
 
@@ -246,41 +247,47 @@ public class FlutterBiometricSecureStorage {
         this.currentActivity = activity;
     }
 
+    @Override
+    public String addPrefixToKey(String key) {
+        return ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
+    }
 
+    @Override
+    public void handleException(Exception e,IExceptionObserver observer) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || !(e instanceof  UserNotAuthenticatedException) || (e.getCause() != null && !(e.getCause() instanceof  UserNotAuthenticatedException))) {
+                observer.onUserUnAuthorizeOrError(e);
+                return;
+        }
 
-    public void requestBiometrics(BiometricPrompt.AuthenticationCallback callback) {
+        BiometricPrompt.AuthenticationCallback callback = new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                super.onAuthenticationError(errorCode, errString);
+                StringWriter stringWriter = new StringWriter();
+                e.printStackTrace(new PrintWriter(stringWriter));
+
+                observer.onUserUnAuthorizeOrError(e);
+            }
+
+            @Override
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                observer.onUserAuthorize();
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                super.onAuthenticationFailed();
+                StringWriter stringWriter = new StringWriter();
+                e.printStackTrace(new PrintWriter(stringWriter));
+            }
+        };
+
         final Runnable changeView = new Runnable() {
             public void run() {
-
-                if(isRequestBiometricDialog){
-                    callback.onAuthenticationError(BiometricPrompt.ERROR_UNABLE_TO_PROCESS, "Another process is currently running, unable to start a new one.");
-                    return;
-                }
-
-                Executor executor = ContextCompat.getMainExecutor(applicationContext);
+                executor = ContextCompat.getMainExecutor(applicationContext);
                 BiometricPrompt biometricPrompt = new BiometricPrompt(currentActivity,
-                        executor, new BiometricPrompt.AuthenticationCallback() {
-                    @Override
-                    public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                        super.onAuthenticationError(errorCode, errString);
-                        callback.onAuthenticationError(errorCode, errString);
-                        isRequestBiometricDialog = false;
-                    }
-
-                    @Override
-                    public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                        super.onAuthenticationSucceeded(result);
-                        callback.onAuthenticationSucceeded(result);
-                        isRequestBiometricDialog = false;
-                    }
-
-                    @Override
-                    public void onAuthenticationFailed() {
-                        super.onAuthenticationFailed();
-                        callback.onAuthenticationFailed();
-                        isRequestBiometricDialog = false;
-                    }
-                });
+                        executor, callback);
 
                 try {
                     JSONObject jsonObj = new JSONObject((String) Objects.requireNonNull(options.get("userAuthenticationRequired")));
@@ -292,19 +299,14 @@ public class FlutterBiometricSecureStorage {
                             .build();
 
                     biometricPrompt.authenticate(promptInfo);
-                    isRequestBiometricDialog = true;
                 } catch (JSONException e) {
                     Log.e(TAG, "Decode json object error", e);
-
                     callback.onAuthenticationFailed();
-                    isRequestBiometricDialog = false;
                 }
             }
         };
 
         currentActivity.runOnUiThread(changeView);
-
-
     }
 
 }
