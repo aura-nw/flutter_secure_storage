@@ -67,7 +67,7 @@ public class FlutterSecureStorageHandler {
         }
     }
 
-    public String addPrefixToKey(String key){
+    public String addPrefixToKey(String key)  throws Exception {
         ISecureStorage secureStorageInstance = ensureInitialized();
         return secureStorageInstance.addPrefixToKey(key);
     }
