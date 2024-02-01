@@ -249,6 +249,7 @@ public class FlutterBiometricSecureStorage implements  ISecureStorage{
 
     @Override
     public String addPrefixToKey(String key) {
+        ensureInitialized();
         return ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
     }
 
