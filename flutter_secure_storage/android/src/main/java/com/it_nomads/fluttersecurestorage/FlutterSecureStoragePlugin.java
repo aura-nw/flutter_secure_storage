@@ -1,5 +1,6 @@
 package com.it_nomads.fluttersecurestorage;
 
+import android.app.Activity;
 import android.content.Context;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -7,31 +8,35 @@ import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.fragment.app.FragmentActivity;
 
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Map;
+import java.util.Objects;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 
-public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlugin {
+public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlugin, ActivityAware {
 
     private static final String TAG = "FlutterSecureStoragePl";
     private MethodChannel channel;
-    private FlutterSecureStorage secureStorage;
     private HandlerThread workerThread;
     private Handler workerThreadHandler;
 
+    private FlutterSecureStorageHandler secureStorageHandler;
+
     public void initInstance(BinaryMessenger messenger, Context context) {
         try {
-            secureStorage = new FlutterSecureStorage(context);
-
+            secureStorageHandler = new FlutterSecureStorageHandler(context);
             workerThread = new HandlerThread("com.it_nomads.fluttersecurestorage.worker");
             workerThread.start();
             workerThreadHandler = new Handler(workerThread.getLooper());
@@ -57,7 +62,8 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
             channel.setMethodCallHandler(null);
             channel = null;
         }
-        secureStorage = null;
+        secureStorageHandler.dispose();
+        secureStorageHandler = null;
     }
 
     @Override
@@ -68,7 +74,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
     }
 
     @SuppressWarnings("unchecked")
-    private String getKeyFromCall(MethodCall call) {
+    private String getKeyFromCall(MethodCall call) throws Exception {
         Map<String, Object> arguments = (Map<String, Object>) call.arguments;
         return addPrefixToKey((String) arguments.get("key"));
     }
@@ -79,8 +85,32 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
         return (String) arguments.get("value");
     }
 
-    private String addPrefixToKey(String key) {
-        return secureStorage.ELEMENT_PREFERENCES_KEY_PREFIX + "_" + key;
+    private String addPrefixToKey(String key) throws Exception {
+        return secureStorageHandler.addPrefixToKey(key);
+    }
+
+    @Override
+    public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+        Activity activity = binding.getActivity();
+        if (activity instanceof FragmentActivity) {
+            secureStorageHandler.startListenActivityChange((FragmentActivity) binding.getActivity());
+        }
+
+    }
+
+    @Override
+    public void onDetachedFromActivityForConfigChanges() {
+        onDetachedFromActivity();
+    }
+
+    @Override
+    public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+        onAttachedToActivity(binding);
+    }
+
+    @Override
+    public void onDetachedFromActivity() {
+        secureStorageHandler.startListenActivityChange(null);
     }
 
     /**
@@ -114,7 +144,7 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
     /**
      * Wraps the functionality of onMethodCall() in a Runnable for execution in the worker thread.
      */
-    class MethodRunner implements Runnable {
+    class MethodRunner implements Runnable, IExceptionObserver {
         private final MethodCall call;
         private final Result result;
 
@@ -128,15 +158,15 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
         public void run() {
             boolean resetOnError = false;
             try {
-                secureStorage.options = (Map<String, Object>) ((Map<String, Object>) call.arguments).get("options");
-                resetOnError = secureStorage.getResetOnError();
+                secureStorageHandler.setOptions((Map<String, Object>) ((Map<String, Object>) call.arguments).get("options"));
+                resetOnError = secureStorageHandler.getResetOnError();
                 switch (call.method) {
                     case "write": {
                         String key = getKeyFromCall(call);
                         String value = getValueFromCall(call);
 
                         if (value != null) {
-                            secureStorage.write(key, value);
+                            secureStorageHandler.write(key, value);
                             result.success(null);
                         } else {
                             result.error("null", null, null);
@@ -146,8 +176,8 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                     case "read": {
                         String key = getKeyFromCall(call);
 
-                        if (secureStorage.containsKey(key)) {
-                            String value = secureStorage.read(key);
+                        if (secureStorageHandler.containsKey(key)) {
+                            String value = secureStorageHandler.read(key);
                             result.success(value);
                         } else {
                             result.success(null);
@@ -155,25 +185,25 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                         break;
                     }
                     case "readAll": {
-                        result.success(secureStorage.readAll());
+                        result.success(secureStorageHandler.readAll());
                         break;
                     }
                     case "containsKey": {
                         String key = getKeyFromCall(call);
 
-                        boolean containsKey = secureStorage.containsKey(key);
+                        boolean containsKey = secureStorageHandler.containsKey(key);
                         result.success(containsKey);
                         break;
                     }
                     case "delete": {
                         String key = getKeyFromCall(call);
 
-                        secureStorage.delete(key);
+                        secureStorageHandler.delete(key);
                         result.success(null);
                         break;
                     }
                     case "deleteAll": {
-                        secureStorage.deleteAll();
+                        secureStorageHandler.deleteAll();
                         result.success(null);
                         break;
                     }
@@ -182,25 +212,32 @@ public class FlutterSecureStoragePlugin implements MethodCallHandler, FlutterPlu
                         break;
                 }
             } catch (FileNotFoundException e) {
-                Log.i("Creating sharedPrefs", e.getLocalizedMessage());
+                Log.i("Creating sharedPrefs", Objects.requireNonNull(e.getLocalizedMessage()));
             } catch (Exception e) {
                 if (resetOnError) {
                     try {
-                        secureStorage.deleteAll();
+                        secureStorageHandler.deleteAll();
                         result.success("Data has been reset");
                     } catch (Exception ex) {
-                        handleException(ex);
+                        secureStorageHandler.handleException(this, e);
                     }
                 } else {
-                    handleException(e);
+                    secureStorageHandler.handleException(this, e);
                 }
             }
         }
 
-        private void handleException(Exception e) {
+        @Override
+        public void onUserUnAuthorizeOrError(Exception e) {
             StringWriter stringWriter = new StringWriter();
             e.printStackTrace(new PrintWriter(stringWriter));
             result.error("Exception encountered", call.method, stringWriter.toString());
         }
+
+        @Override
+        public void onUserAuthorize() {
+            run();
+        }
+
     }
 }

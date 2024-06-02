@@ -6,6 +6,7 @@
 //
 
 import Flutter
+import LocalAuthentication
 
 public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
     
@@ -53,7 +54,12 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         }
         
         let response = flutterSecureStorageManager.read(key: values.key!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable)
-        result(response.value)
+        
+        if(response.status != errSecSuccess){
+            result(FlutterError(code: String(response.status!), message: nil, details: nil))
+        }else{
+            result(response.value)
+        }
     }
     
     private func write(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
@@ -73,9 +79,13 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
             return
         }
         
-        let response = flutterSecureStorageManager.write(key: values.key!, value: values.value!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable, accessibility: values.accessibility)
+        let response = flutterSecureStorageManager.write(key: values.key!, value: values.value!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable, accessibility: values.accessibility,useBioMetric: values.useBiometric)
         
-        result(response)
+        if(response != errSecSuccess){
+            result(FlutterError(code: String(response), message: nil, details: nil))
+        }else{
+            result(response)
+        }
     }
     
     private func delete(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
@@ -86,7 +96,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         }
         
         let response = flutterSecureStorageManager.delete(key: values.key!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable)
-        
+            
         result(response)
     }
     
@@ -94,7 +104,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         let values = parseCall(call)
         
         let response = flutterSecureStorageManager.deleteAll(groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable)
-        
+            
         result(response)
     }
     
@@ -103,7 +113,13 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         
         let response = flutterSecureStorageManager.readAll(groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable)
         
-        result(response.value);
+        
+        if(response.status != errSecSuccess){
+            result(FlutterError(code: String(response.status!),message: nil,details: nil))
+        }else{
+            result(response.value)
+        }
+
     }
     
     private func containsKey(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
@@ -114,7 +130,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         
         let response = flutterSecureStorageManager.containsKey(key: values.key!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable)
         
-        result(response);
+        result(response)
     }
     
     private func parseCall(_ call: FlutterMethodCall) -> FlutterSecureStorageRequest {
@@ -125,6 +141,21 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         let groupId = options["groupId"] as? String
         let synchronizableString = options["synchronizable"] as? String
         
+        var useBiometricParse : FlutterSecureStorageUseBioMetric.UseBiometric?
+        
+        if let useBioMetric = options["useBiometric"] as? String{
+            let useBioMetricData = Data(useBioMetric.utf8)
+            
+            do{
+                
+                let jsonDecoder = JSONDecoder()
+                
+                useBiometricParse = try jsonDecoder.decode(FlutterSecureStorageUseBioMetric.UseBiometric.self, from: useBioMetricData)
+                
+            }catch {
+                useBiometricParse = nil
+            }
+        }
         
         let synchronizable: Bool = synchronizableString != nil ? Bool(synchronizableString!)! : false
         
@@ -136,7 +167,10 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
             accountName: accountName,
             groupId: groupId,
             synchronizable: synchronizable,
-            accessibility: accessibility, key: key, value: value
+            accessibility: accessibility,
+            useBiometric: useBiometricParse,
+            key: key,
+            value: value
         )
     }
     
@@ -145,6 +179,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin {
         var groupId: String?
         var synchronizable: Bool?
         var accessibility: String?
+        var useBiometric : FlutterSecureStorageUseBioMetric.UseBiometric?
         var key: String?
         var value: String?
     }
